@@ -43,6 +43,9 @@ matplotlib.use('tkagg')
 import matplotlib.pyplot as plt
 
 import time
+from multiprocessing import Process, Array, Pool
+import concurrent.futures
+
 import yaml
 import argparse
 import numpy as np
@@ -64,6 +67,10 @@ np.set_printoptions(precision=2)
 
 recorded_data = torch.load('record_data')
 
+def process_arguments(n, param_list):
+    for i in range(n):
+        yield param_list[i]
+
 def change_params(mpc_c, param_dict):
     if 'horizon' in param_dict.keys():
         mpc_c.change_horizon(param_dict['horizon'])
@@ -79,9 +86,11 @@ def change_params(mpc_c, param_dict):
         cost_params[k] = {'weight':v}
     mpc_c.controller.rollout_fn.change_cost_params(cost_params)
 
-def mpc_evaluate(args, param_dict):
-    robot_file = args.robot + '.yml'
-    task_file = args.robot + '_reacher.yml'
+def mpc_evaluate(param_dict):
+
+    robot = 'franka'
+    robot_file = robot + '.yml'
+    task_file = robot + '_reacher.yml'
     world_file = 'collision_primitives_3d.yml'
 
     device = torch.device('cuda', 0)
@@ -105,9 +114,7 @@ def mpc_evaluate(args, param_dict):
     assert recorded_length == len(goal_pose_lst) == len(t_step_lst) == len(current_robot_state_lst) == len(command_lst)
 
     dof = command_lst[0]['position'].shape[0]
-    print('dof', dof)
     cmd_error = np.zeros(dof)
-    print('recorded length', recorded_length)
 
     for i in range(recorded_length):
         goal_pose = goal_pose_lst[i]
@@ -122,22 +129,80 @@ def mpc_evaluate(args, param_dict):
         command = mpc_control.get_command(t_step, current_robot_state, control_dt=sim_dt, WAIT=True)
         q_des = copy.deepcopy(command['position'])
         q_des_target = copy.deepcopy((command_lst[i])['position'])
-        # e = (q_des_target - q_des)
-        # print(f't: {i}, error: {e}')
         cmd_error += (q_des_target - q_des)**2
 
-    print(f'sum error: {cmd_error}')
+    mpc_control.close()
+
     cmd_error /= recorded_length
-    print('avg_error', end=':')
-    [print(f'{c:.5f}, ') for c in cmd_error]
     cmd_error = np.sum(cmd_error)/dof
-    print('cmd_error',cmd_error*10000.0)
+    print(f'cmd_error {cmd_error:.4f}')
+    return cmd_error
+    # res_array[res_array_index] = cmd_error
+    return
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='pass args')
-    parser.add_argument('--robot', type=str, default='franka', help='Robot to spawn')
-    args = parser.parse_args()
 
-    param_d = {'horizon':40, 'state_bound':1}
+    # ===== Only one =====
+    # start = time.time()
+    # mpc_evaluate({'horizon':40, 'state_bound':1})
+    # dur = time.time() - start
+    # print(f'Execution  time: {dur:.4f}s')
 
-    mpc_evaluate(args, param_d)
+    # ==== Multiple processes - Manual ====
+    # num_process = 4
+    # res = Array('d', [0]*num_process)
+    # param_l = [{'horizon':40, 'state_bound':1},
+    #            {'horizon':50, 'state_bound':100},
+    #            {'horizon': 45, 'state_bound': 1},
+    #            {'horizon': 55, 'state_bound': 100}]
+    #
+    # p0 = Process(target=mpc_evaluate, args=(args, param_l[0], res, 0))
+    # p1 = Process(target=mpc_evaluate, args=(args, param_l[1], res, 1))
+    #
+    # start = time.time()
+    # p0.start()
+    # p1.start()
+    #
+    # p0.join()
+    # p1.join()
+
+    # dur = time.time() - start
+    # print(f'Execution  time: {dur:.4f}s')
+
+    # ==== Multiple processes ====
+    num_process = 2
+    param_l = [{'horizon':40, 'state_bound':1},
+               # {'horizon':50, 'state_bound':100},
+               # {'horizon': 45, 'state_bound': 1},
+               {'horizon': 55, 'state_bound': 100}]
+
+    processes = []
+    process_args = process_arguments(num_process, param_l)
+    for k in param_l:
+        print(f'\n%%%%%%%%arg:{k}--{type(k)}')
+        p = Process(target=mpc_evaluate, args=(k,))
+        processes.append(p)
+
+    start = time.time()
+    for process in processes:
+        process.start()
+
+    for process in processes:
+        process.join()
+
+    pardur = time.time() - start
+    print(f'Execution  time: {pardur:.4f}s')
+
+    #
+    # print('\n============================\nseq execution....')
+    # start = time.time()
+    # for i in range(num_process):
+    #     mpc_evaluate(args, param_l[i], res, i)
+    # seqdur = time.time() - start
+    #
+    # print('Results')
+    # for r in res:
+    #     print(f'{r:.4f}')
+    #
+    # print(f'Par Execution  time: {pardur:.4f}s')
+    # print(f'Seq Execution  time: {seqdur:.4f}s')
