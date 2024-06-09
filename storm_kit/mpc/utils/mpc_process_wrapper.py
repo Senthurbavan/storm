@@ -36,13 +36,14 @@ from torch.multiprocessing import Pool, Process, set_start_method, Queue
 import numpy as np
 
 class ControlProcess(object):
-    def __init__(self, controller, control_space='acc', control_dt=0.01):
+    def __init__(self, controller, control_space='acc', control_dt=0.01, idx=0):
         try:
             controller.rollout_fn.dynamics_model.robot_model.delete_lxml_objects()
         except Exception:
             pass
-            
-        torch.save(controller, 'control_instance.p')
+
+        control_inst_name = f'control_instance{idx}.p'
+        torch.save(controller, control_inst_name)
         
         try:
             controller.rollout_fn.dynamics_model.robot_model.load_lxml_objects()
@@ -68,7 +69,7 @@ class ControlProcess(object):
         self.opt_queue = Queue(maxsize=1)
 
         
-        self.opt_process = Process(target=optimize_process, args=('control_instance.p', self.opt_queue,self.result_queue))
+        self.opt_process = Process(target=optimize_process, args=(control_inst_name, self.opt_queue,self.result_queue))
         self.opt_process.daemon = True
         self.opt_process.start()
         self.controller = controller

@@ -31,11 +31,11 @@ class BaseTask():
     def __init__(self, tensor_args={'device':"cpu", 'dtype':torch.float32}):
         self.tensor_args = tensor_args
         self.prev_qdd_des = None
-    def init_aux(self):
+    def init_aux(self, idx=0):
         self.state_filter = JointStateFilter(filter_coeff=self.exp_params['state_filter_coeff'], dt=self.exp_params['control_dt'])
         
         self.command_filter = JointStateFilter(filter_coeff=self.exp_params['cmd_filter_coeff'], dt=self.exp_params['control_dt'])
-        self.control_process = ControlProcess(self.controller)
+        self.control_process = ControlProcess(self.controller, idx=idx)
         self.n_dofs = self.controller.rollout_fn.dynamics_model.n_dofs
         self.zero_acc = np.zeros(self.n_dofs)
         

@@ -34,13 +34,13 @@ from .task_base import BaseTask
 
 
 class ArmTask(BaseTask):
-    def __init__(self, task_file='ur10.yml', robot_file='ur10_reacher.yml', world_file='collision_env.yml', tensor_args={'device':"cpu", 'dtype':torch.float32}):
+    def __init__(self, task_file='ur10.yml', robot_file='ur10_reacher.yml', world_file='collision_env.yml', tensor_args={'device':"cpu", 'dtype':torch.float32}, idx=0):
 
         super().__init__(tensor_args=tensor_args)
         
         
         self.controller = self.init_mppi(task_file, robot_file, world_file)
-        self.init_aux()
+        self.init_aux(idx=idx)
         self.changed_mppi_params = dict()
 
     def get_rollout_fn(self, **kwargs):
