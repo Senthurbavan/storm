@@ -131,12 +131,12 @@ def mpc_robot_interactive(args):
         q_des_target = copy.deepcopy((command_lst[i])['position'])
 
         # print(f'i:{i} recorded and computed q_des\n\t{q_des_target}\n\t{q_des}')
-        cmd_error = (q_des_target - q_des)
-        cmd_error_ratio = abs(cmd_error / q_des_target)*100
-        if sum(cmd_error_ratio>5):
-            print(f'step: {i} error:', end='\t[')
-            [print(f' {e:.2f} ', end='') for e in cmd_error_ratio]
-            print(']')
+        # cmd_error = (q_des_target - q_des)
+        # cmd_error_ratio = abs(cmd_error / q_des_target)*100
+        # if sum(cmd_error_ratio>5):
+        #     print(f'step: {i} error:', end='\t[')
+        #     [print(f' {e:.2f} ', end='') for e in cmd_error_ratio]
+        #     print(']')
     print(f'Recorded length: {recorded_length}')
     print('End')
 
