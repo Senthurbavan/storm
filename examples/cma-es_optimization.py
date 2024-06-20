@@ -35,7 +35,7 @@ torch.backends.cuda.matmul.allow_tf32 = True
 torch.backends.cudnn.allow_tf32 = True
 #
 
-
+import cma
 
 import matplotlib
 matplotlib.use('tkagg')
@@ -67,6 +67,21 @@ np.set_printoptions(precision=2)
 
 recorded_data = torch.load('record_data')
 
+UPPER = np.array([10000, 10000, 100, 1000])
+LOWER = np.array([100, 100, 1, 10])
+DEFAULT = np.array([5000, 5000, 30, 100])
+PARAMS = ['primitive_collision', 'robot_self_collision', 'manipulability', 'stop_cost']
+
+def transform_params(params):
+    params = np.array(params)
+    transformed = LOWER + (UPPER - LOWER)*(params/10)
+    transformed = transformed.astype('int64')
+    param_dict = dict(zip(PARAMS, transformed))
+    return param_dict
+
+def inv_transform(param):
+    return 10*(param - LOWER)/(UPPER-LOWER)
+
 def change_params(mpc_c, param_dict):
     if 'horizon' in param_dict.keys():
         mpc_c.change_horizon(param_dict['horizon'])
@@ -81,6 +96,57 @@ def change_params(mpc_c, param_dict):
     for k, v in param_dict.items():
         cost_params[k] = {'weight':v}
     mpc_c.controller.rollout_fn.change_cost_params(cost_params)
+
+    # ==== Multiple processes ====
+    # num_process = 1
+    #
+    # processes = []
+    # for i in range(num_process):
+    #     p = Process(target=mpc_evaluate, args=(param_l[i],i))
+    #     processes.append(p)
+    #
+    # start = time.time()
+    # for process in processes:
+    #     process.start()
+    #
+    # for process in processes:
+    #     process.join()
+    # pardur = time.time() - start
+    #
+    # print(f'Execution  time: {pardur:.4f}s')
+
+def evaluate(param_list):
+    # NEED TO SETUP RETURN VALUE
+    loss = []
+    processes = []
+    for i in range(len(param_list)):
+        param_dic = transform_params(param_list[i])
+        p = Process(target=mpc_evaluate, args=(param_dic, i))
+        processes.append(p)
+
+    start = time.time()
+    for process in processes:
+        process.start()
+
+    for process in processes:
+        process.join()
+
+    pardur = time.time() - start
+    print(f'Execution  time: {pardur:.4f}s')
+    return loss
+
+
+def evaluate_seq(param_list):
+    loss = []
+    start = time.time()
+    for i in range(len(param_list)):
+        param_dic = transform_params(param_list[i])
+        print(f'\n\nparam_dict[{i}] {param_dic}\n')
+        error = mpc_evaluate(param_dic, 0)
+        loss.append(error)
+    seqdur = time.time() - start
+    print(f'\nExecution  time[{i}]: {seqdur:.4f}s\n')
+    return loss
 
 def mpc_evaluate(param_dict, idx=0):
 
@@ -132,14 +198,53 @@ def mpc_evaluate(param_dict, idx=0):
     cmd_error /= recorded_length
     cmd_error = np.sum(cmd_error)/dof
     print(f'cmd_error {cmd_error:.4f}')
-    return
+    return cmd_error
 
 if __name__ == '__main__':
+    ndim = len(PARAMS)
+    # init_param = inv_transform(DEFAULT)
+    init_param = np.ones((ndim))*5
 
-    param_l = [{'horizon':40, 'state_bound':1},         #0.0053
-               {'horizon':50, 'state_bound':100},       #0.0035
-               {'horizon': 45, 'state_bound': 1},       #0.0016
-               {'horizon': 55, 'state_bound': 100}]     #0.0071
+    opts = cma.CMAOptions()
+    opts['tolfun'] = 1e-5
+    opts['popsize'] = 12
+    opts['maxiter'] = ndim * 100
+    opts['bounds'] = [0, 10]
+
+    es = cma.CMAEvolutionStrategy(init_param, 2, opts)
+    i = 0
+    t0 = time.time()
+    while not es.stop():
+        sols = es.ask()
+        print(f'\n\nIteration {i} Params:')
+        for sol in sols:
+            print(f'{transform_params(sol)}')
+        loss = evaluate_seq(sols)
+        loss = np.array(loss)
+        idx = np.argmin(loss)
+        es.tell(sols, loss)
+        es.logger.add()
+        es.disp()
+        i += 1
+        curr_best = np.array(sols).mean(0)
+        curr_min = np.array(sols)[idx]
+        print("\n\n\n\n[INFO] iter %2d | time %10.4f | avg loss %10.4f | min loss %10.4f" % (
+            i,
+            time.time() - t0,
+            loss.mean(), loss.min()))
+        V = transform_params(curr_best)
+        print(f'current best parameters: {V}')
+        M = transform_params(curr_min)
+        print(f'current min parameters: {M}\n\n\n')
+    es.result_pretty()
+
+
+# if __name__ == '__main__':
+
+    # param_l = [{'horizon':40, 'state_bound':1},         #0.0053
+    #            {'horizon':50, 'state_bound':100},       #0.0035
+    #            {'horizon': 45, 'state_bound': 1},       #0.0016
+    #            {'horizon': 55, 'state_bound': 100}]     #0.0071
 
     # ===== Only one =====
     # start = time.time()
@@ -148,19 +253,19 @@ if __name__ == '__main__':
     # print(f'Execution  time: {dur:.4f}s')
 
     # ==== Multiple processes ====
-    num_process = 1
-
-    processes = []
-    for i in range(num_process):
-        p = Process(target=mpc_evaluate, args=(param_l[i],i))
-        processes.append(p)
-
-    start = time.time()
-    for process in processes:
-        process.start()
-
-    for process in processes:
-        process.join()
-    pardur = time.time() - start
-
-    print(f'Execution  time: {pardur:.4f}s')
+    # num_process = 1
+    #
+    # processes = []
+    # for i in range(num_process):
+    #     p = Process(target=mpc_evaluate, args=(param_l[i],i))
+    #     processes.append(p)
+    #
+    # start = time.time()
+    # for process in processes:
+    #     process.start()
+    #
+    # for process in processes:
+    #     process.join()
+    # pardur = time.time() - start
+    #
+    # print(f'Execution  time: {pardur:.4f}s')

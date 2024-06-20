@@ -134,6 +134,7 @@ class KnotSampleLib(object):
     def __init__(self, horizon=0, d_action=0, n_knots=0, degree=3, seed=0, tensor_args={'device':"cpu", 'dtype':torch.float32}, sample_method='halton',
                  covariance_matrix = None, **kwargs):
         self.ndims = n_knots * d_action
+        print(f'\nKnotSampleLib constructor: n_knots: {n_knots}, d_action:{d_action}, self.ndims: {self.ndims}')
         self.n_knots = n_knots
         self.horizon = horizon
         self.d_action = d_action

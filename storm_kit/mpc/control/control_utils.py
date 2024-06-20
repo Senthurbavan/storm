@@ -239,9 +239,11 @@ def generate_halton_samples(num_samples, ndims, bases=None, use_ghalton=True, se
     else:
         
         if ndims <= 100:
+            print(f'\ninput for GeneralizedHalton- ndims<=100:{ndims}{type(ndims)}')
             perms = ghalton.EA_PERMS[:ndims]
             sequencer = ghalton.GeneralizedHalton(perms)
         else:
+            print(f'\ninput for GeneralizedHalton- ndims:{ndims}{type(ndims)}, seed_val:{seed_val}{type(seed_val)}\n')
             sequencer = ghalton.GeneralizedHalton(ndims, seed_val)
         samples = torch.tensor(sequencer.get(num_samples), device=device, dtype=float_dtype)
     return samples
