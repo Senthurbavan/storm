@@ -24,8 +24,6 @@
 
 """
 import copy
-from isaacgym import gymapi
-from isaacgym import gymutil
 
 import torch
 torch.multiprocessing.set_start_method('spawn',force=True)
@@ -33,35 +31,12 @@ torch.set_num_threads(8)
 torch.backends.cudnn.benchmark = False
 torch.backends.cuda.matmul.allow_tf32 = True
 torch.backends.cudnn.allow_tf32 = True
-#
 
 import cma
 
-import matplotlib
-matplotlib.use('tkagg')
-
-import matplotlib.pyplot as plt
-
 import time
-from multiprocessing import Process, Array, Pool
-import concurrent.futures
-
-import yaml
-import argparse
+# from multiprocessing import Process, Array, Pool
 import numpy as np
-from quaternion import quaternion, from_rotation_vector, from_rotation_matrix
-import matplotlib.pyplot as plt
-
-from quaternion import from_euler_angles, as_float_array, as_rotation_matrix, from_float_array, as_quat_array
-
-from storm_kit.gym.core import Gym, World
-from storm_kit.gym.sim_robot import RobotSim
-from storm_kit.util_file import get_configs_path, get_gym_configs_path, join_path, load_yaml, get_assets_path
-from storm_kit.gym.helpers import load_struct_from_dict
-
-from storm_kit.util_file import get_mpc_configs_path as mpc_configs_path
-
-from storm_kit.differentiable_robot_model.coordinate_transform import quaternion_to_matrix, CoordinateTransform
 from storm_kit.mpc.task.reacher_task import ReacherTask
 np.set_printoptions(precision=2)
 
@@ -97,43 +72,25 @@ def change_params(mpc_c, param_dict):
         cost_params[k] = {'weight':v}
     mpc_c.controller.rollout_fn.change_cost_params(cost_params)
 
-    # ==== Multiple processes ====
-    # num_process = 1
-    #
-    # processes = []
-    # for i in range(num_process):
-    #     p = Process(target=mpc_evaluate, args=(param_l[i],i))
-    #     processes.append(p)
-    #
-    # start = time.time()
-    # for process in processes:
-    #     process.start()
-    #
-    # for process in processes:
-    #     process.join()
-    # pardur = time.time() - start
-    #
-    # print(f'Execution  time: {pardur:.4f}s')
-
-def evaluate(param_list):
-    # NEED TO SETUP RETURN VALUE
-    loss = []
-    processes = []
-    for i in range(len(param_list)):
-        param_dic = transform_params(param_list[i])
-        p = Process(target=mpc_evaluate, args=(param_dic, i))
-        processes.append(p)
-
-    start = time.time()
-    for process in processes:
-        process.start()
-
-    for process in processes:
-        process.join()
-
-    pardur = time.time() - start
-    print(f'Execution  time: {pardur:.4f}s')
-    return loss
+# def evaluate(param_list):
+#     # NEED TO SETUP RETURN VALUE
+#     loss = []
+#     processes = []
+#     for i in range(len(param_list)):
+#         param_dic = transform_params(param_list[i])
+#         p = Process(target=mpc_evaluate, args=(param_dic, i))
+#         processes.append(p)
+#
+#     start = time.time()
+#     for process in processes:
+#         process.start()
+#
+#     for process in processes:
+#         process.join()
+#
+#     pardur = time.time() - start
+#     print(f'Execution  time: {pardur:.4f}s')
+#     return loss
 
 
 def evaluate_seq(param_list):
@@ -237,35 +194,3 @@ if __name__ == '__main__':
         M = transform_params(curr_min)
         print(f'current min parameters: {M}\n\n\n')
     es.result_pretty()
-
-
-# if __name__ == '__main__':
-
-    # param_l = [{'horizon':40, 'state_bound':1},         #0.0053
-    #            {'horizon':50, 'state_bound':100},       #0.0035
-    #            {'horizon': 45, 'state_bound': 1},       #0.0016
-    #            {'horizon': 55, 'state_bound': 100}]     #0.0071
-
-    # ===== Only one =====
-    # start = time.time()
-    # mpc_evaluate(param_l[1])
-    # dur = time.time() - start
-    # print(f'Execution  time: {dur:.4f}s')
-
-    # ==== Multiple processes ====
-    # num_process = 1
-    #
-    # processes = []
-    # for i in range(num_process):
-    #     p = Process(target=mpc_evaluate, args=(param_l[i],i))
-    #     processes.append(p)
-    #
-    # start = time.time()
-    # for process in processes:
-    #     process.start()
-    #
-    # for process in processes:
-    #     process.join()
-    # pardur = time.time() - start
-    #
-    # print(f'Execution  time: {pardur:.4f}s')
