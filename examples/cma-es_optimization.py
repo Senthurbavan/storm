@@ -35,7 +35,7 @@ torch.backends.cudnn.allow_tf32 = True
 import cma
 
 import time
-# from multiprocessing import Process, Array, Pool
+from multiprocessing import Process, Array
 import numpy as np
 from storm_kit.mpc.task.reacher_task import ReacherTask
 np.set_printoptions(precision=2)
@@ -72,25 +72,27 @@ def change_params(mpc_c, param_dict):
         cost_params[k] = {'weight':v}
     mpc_c.controller.rollout_fn.change_cost_params(cost_params)
 
-# def evaluate(param_list):
-#     # NEED TO SETUP RETURN VALUE
-#     loss = []
-#     processes = []
-#     for i in range(len(param_list)):
-#         param_dic = transform_params(param_list[i])
-#         p = Process(target=mpc_evaluate, args=(param_dic, i))
-#         processes.append(p)
-#
-#     start = time.time()
-#     for process in processes:
-#         process.start()
-#
-#     for process in processes:
-#         process.join()
-#
-#     pardur = time.time() - start
-#     print(f'Execution  time: {pardur:.4f}s')
-#     return loss
+def evaluate(param_list):
+    loss = Array('d', [float('inf')]*len(param_list))
+    processes = []
+    for i in range(len(param_list)):
+        param_dic = transform_params(param_list[i])
+        p = Process(target=mpc_evaluate, args=(param_dic, i, loss))
+        processes.append(p)
+
+    start = time.time()
+    for process in processes:
+        process.start()
+
+    for process in processes:
+        process.join()
+
+    pardur = time.time() - start
+    print(f'Execution  time: {pardur:.4f}s')
+    print('loss list:')
+    [print(f'{x:.7f}', end=', ') for x in np.array(loss)]
+    print('')
+    return loss
 
 
 def evaluate_seq(param_list):
@@ -105,8 +107,7 @@ def evaluate_seq(param_list):
     # print(f'\nExecution  time[{i}]: {seqdur:.4f}s\n')
     return loss
 
-def mpc_evaluate(param_dict, idx=0):
-
+def mpc_evaluate(param_dict, idx=0, loss_list=None):
     robot = 'franka'
     robot_file = robot + '.yml'
     task_file = robot + '_reacher.yml'
@@ -154,7 +155,9 @@ def mpc_evaluate(param_dict, idx=0):
 
     cmd_error /= recorded_length
     cmd_error = np.sum(cmd_error)/dof
-    # print(f'cmd_error {cmd_error:.4f}')
+    print(f'cmd_error[{idx}] {cmd_error:.7f}')
+    if (loss_list is not None):
+        loss_list[idx] = cmd_error
     return cmd_error
 
 if __name__ == '__main__':
@@ -176,7 +179,7 @@ if __name__ == '__main__':
     opts = cma.CMAOptions()
     opts['tolfun'] = 1e-5
     opts['popsize'] = 2#12
-    opts['maxiter'] = 10#ndim * 100
+    opts['maxiter'] = 2#ndim * 100
     opts['bounds'] = [0, 10]
 
     es = cma.CMAEvolutionStrategy(init_param, 2, opts)
@@ -187,7 +190,7 @@ if __name__ == '__main__':
         # print(f'\n\nIteration {i} Params:')
         # for sol in sols:
         #     print(f'{transform_params(sol)}')
-        loss = evaluate_seq(sols)
+        loss = evaluate(sols)
         loss = np.array(loss)
         idx = np.argmin(loss)
         es.tell(sols, loss)
@@ -198,14 +201,14 @@ if __name__ == '__main__':
         stats['theta_mu'].append(curr_best)
         stats['avg_loss'].append(loss.mean())
         stats['theta_min_loss'].append(curr_min)
-        print("\n\n\n\n[INFO] iter %2d | time %10.4f | avg loss %10.4f | min loss %10.4f" % (
+        print("\n\n[INFO] iter %2d | time %10.4f | avg loss %10.7f | min loss %10.7f" % (
             i,
             time.time() - t0,
             loss.mean(), loss.min()))
         V = transform_params(curr_best)
         print(f'current mean parameters: {V}')
         M = transform_params(curr_min)
-        print(f'current min-loss parameters: {M}\n\n\n')
+        print(f'current min-loss parameters: {M}\n\n')
         if (i+1) % 2 == 0:
             with open(log_file_path, 'wb') as f:
                 np.save(f, stats)
