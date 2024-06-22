@@ -24,7 +24,7 @@
 
 """
 import copy
-
+import os
 import torch
 torch.multiprocessing.set_start_method('spawn',force=True)
 torch.set_num_threads(8)
@@ -95,14 +95,14 @@ def change_params(mpc_c, param_dict):
 
 def evaluate_seq(param_list):
     loss = []
-    start = time.time()
+    # start = time.time()
     for i in range(len(param_list)):
         param_dic = transform_params(param_list[i])
-        print(f'\n\nparam_dict[{i}] {param_dic}\n')
+        # print(f'\n\nparam_dict[{i}] {param_dic}\n')
         error = mpc_evaluate(param_dic, 0)
         loss.append(error)
-    seqdur = time.time() - start
-    print(f'\nExecution  time[{i}]: {seqdur:.4f}s\n')
+    # seqdur = time.time() - start
+    # print(f'\nExecution  time[{i}]: {seqdur:.4f}s\n')
     return loss
 
 def mpc_evaluate(param_dict, idx=0):
@@ -154,7 +154,7 @@ def mpc_evaluate(param_dict, idx=0):
 
     cmd_error /= recorded_length
     cmd_error = np.sum(cmd_error)/dof
-    print(f'cmd_error {cmd_error:.4f}')
+    # print(f'cmd_error {cmd_error:.4f}')
     return cmd_error
 
 if __name__ == '__main__':
@@ -162,10 +162,21 @@ if __name__ == '__main__':
     # init_param = inv_transform(DEFAULT)
     init_param = np.ones((ndim))*5
 
+    # log_dir = os.environ['SCRATCH']
+    log_dir = os.environ['HOME']
+    log_file = 'cmaes_log.npy'
+    log_file_path = os.path.join(log_dir, log_file)
+
+    stats = {
+        'avg_loss': [],
+        'theta_mu': [],
+        'theta_min_loss': [],
+    }
+
     opts = cma.CMAOptions()
     opts['tolfun'] = 1e-5
-    opts['popsize'] = 12
-    opts['maxiter'] = ndim * 100
+    opts['popsize'] = 2#12
+    opts['maxiter'] = 10#ndim * 100
     opts['bounds'] = [0, 10]
 
     es = cma.CMAEvolutionStrategy(init_param, 2, opts)
@@ -173,24 +184,31 @@ if __name__ == '__main__':
     t0 = time.time()
     while not es.stop():
         sols = es.ask()
-        print(f'\n\nIteration {i} Params:')
-        for sol in sols:
-            print(f'{transform_params(sol)}')
+        # print(f'\n\nIteration {i} Params:')
+        # for sol in sols:
+        #     print(f'{transform_params(sol)}')
         loss = evaluate_seq(sols)
         loss = np.array(loss)
         idx = np.argmin(loss)
         es.tell(sols, loss)
         es.logger.add()
         es.disp()
-        i += 1
         curr_best = np.array(sols).mean(0)
         curr_min = np.array(sols)[idx]
+        stats['theta_mu'].append(curr_best)
+        stats['avg_loss'].append(loss.mean())
+        stats['theta_min_loss'].append(curr_min)
         print("\n\n\n\n[INFO] iter %2d | time %10.4f | avg loss %10.4f | min loss %10.4f" % (
             i,
             time.time() - t0,
             loss.mean(), loss.min()))
         V = transform_params(curr_best)
-        print(f'current best parameters: {V}')
+        print(f'current mean parameters: {V}')
         M = transform_params(curr_min)
-        print(f'current min parameters: {M}\n\n\n')
+        print(f'current min-loss parameters: {M}\n\n\n')
+        if (i+1) % 2 == 0:
+            with open(log_file_path, 'wb') as f:
+                np.save(f, stats)
+        i += 1
+    print('\n\n\n========== COMPLETED ==========')
     es.result_pretty()
