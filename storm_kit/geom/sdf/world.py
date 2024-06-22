@@ -26,8 +26,8 @@ import numpy as np
 import trimesh
 from trimesh.voxel.creation import voxelize
 import torch
-import matplotlib
-matplotlib.use('tkagg')
+# import matplotlib
+# matplotlib.use('tkagg')
 
 import matplotlib.pyplot as plt
 
