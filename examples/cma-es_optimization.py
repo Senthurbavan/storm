@@ -174,6 +174,7 @@ if __name__ == '__main__':
         'avg_loss': [],
         'theta_mu': [],
         'theta_min_loss': [],
+        'results': None
     }
 
     opts = cma.CMAOptions()
@@ -187,9 +188,6 @@ if __name__ == '__main__':
     t0 = time.time()
     while not es.stop():
         sols = es.ask()
-        # print(f'\n\nIteration {i} Params:')
-        # for sol in sols:
-        #     print(f'{transform_params(sol)}')
         loss = evaluate(sols)
         loss = np.array(loss)
         idx = np.argmin(loss)
@@ -213,5 +211,12 @@ if __name__ == '__main__':
             with open(log_file_path, 'wb') as f:
                 np.save(f, stats)
         i += 1
-    print('\n\n\n========== COMPLETED ==========')
     es.result_pretty()
+    res = es.result
+    print(f'\nResults...')
+    for r in res:
+        print(r)
+    stats['results'] = res
+    with open(log_file_path, 'wb') as f:
+        np.save(f, stats)
+    print('\n\n\n========== COMPLETED ==========')
