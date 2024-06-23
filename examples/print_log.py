@@ -2,10 +2,11 @@ import numpy as np
 import os
 import cma
 
-UPPER = np.array([10000, 10000, 100, 1000])
-LOWER = np.array([100, 100, 1, 10])
-DEFAULT = np.array([5000, 5000, 30, 100])
-PARAMS = ['primitive_collision', 'robot_self_collision', 'manipulability', 'stop_cost']
+UPPER = np.array([10000, 10000, 500, 100, 500])
+LOWER = np.array([1000, 1000, 10, 1, 50])
+DEFAULT = np.array([5000, 5000, 100, 15, 100])
+PARAMS = ['primitive_collision', 'robot_self_collision',
+          'stop_cost', 'goal_pose0', 'goal_pose1']
 
 def transform_params(params):
     params = np.array(params)
@@ -40,6 +41,8 @@ for i in range(len(theta_mu)):
     print(theta_mu[i], end='\t')
     print(f'Avg loss: {avg_loss[i]:.7f}')
 
-print(f'printing results... {type(res)}')
+print(f'printing results...')
 for r in res:
     print(r)
+print('Result Params...')
+print(transform_params(res[5]))

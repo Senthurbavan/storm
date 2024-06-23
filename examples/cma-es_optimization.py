@@ -42,16 +42,23 @@ np.set_printoptions(precision=2)
 
 recorded_data = torch.load('record_data')
 
-UPPER = np.array([10000, 10000, 100, 1000])
-LOWER = np.array([100, 100, 1, 10])
-DEFAULT = np.array([5000, 5000, 30, 100])
-PARAMS = ['primitive_collision', 'robot_self_collision', 'manipulability', 'stop_cost']
+UPPER = np.array([10000, 10000, 500, 100, 500])
+LOWER = np.array([1000, 1000, 10, 1, 50])
+DEFAULT = np.array([5000, 5000, 100, 15, 100])
+PARAMS = ['primitive_collision', 'robot_self_collision',
+          'stop_cost', 'goal_pose0', 'goal_pose1']
 
 def transform_params(params):
     params = np.array(params)
     transformed = LOWER + (UPPER - LOWER)*(params/10)
     transformed = transformed.astype('int64')
     param_dict = dict(zip(PARAMS, transformed))
+    # print(f'printing param dic.. \n{param_dict}')
+    if ('goal_pose0' in param_dict) and ('goal_pose1' in param_dict):
+        v = [param_dict['goal_pose0'], param_dict['goal_pose1']]
+        del param_dict['goal_pose0']; del param_dict['goal_pose1']
+        param_dict['goal_pose'] = v
+    # print(f'printing param dic after modification.. \n{param_dict}')
     return param_dict
 
 def inv_transform(param):
@@ -178,7 +185,7 @@ if __name__ == '__main__':
     }
 
     opts = cma.CMAOptions()
-    opts['tolfun'] = 1e-5
+    opts['tolfun'] = 1e-9
     opts['popsize'] = 2#12
     opts['maxiter'] = 2#ndim * 100
     opts['bounds'] = [0, 10]
