@@ -286,7 +286,7 @@ class MultipleSampleLib(SampleLib):
                                                  tensor_args=tensor_args,
                                                  fixed_samples=fixed_samples)
 
-        self.knot_halton_sample_lib = KnotSampleLib(horizon=horizon, d_action=d_action, n_knots=horizon//knot_scale, degree=2, sample_method='halton', tensor_args=tensor_args)
+        self.knot_halton_sample_lib = KnotSampleLib(horizon=horizon, d_action=d_action, seed=seed, n_knots=horizon//knot_scale, degree=2, sample_method='halton', tensor_args=tensor_args)
         
         #random
         self.random_sample_lib = RandomSampleLib(horizon=horizon, d_action=d_action, seed=seed,
