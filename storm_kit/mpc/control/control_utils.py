@@ -238,7 +238,7 @@ def generate_halton_samples(num_samples, ndims, bases=None, use_ghalton=True, se
             samples[:, dim] = generate_van_der_corput_samples_batch(idx_batch, bases[dim])
     else:
         
-        if ndims <= 100:
+        if ndims <= 0:
             print(f'\ninput for GeneralizedHalton- ndims<=100:{ndims}{type(ndims)}')
             perms = ghalton.EA_PERMS[:ndims]
             sequencer = ghalton.GeneralizedHalton(perms)
