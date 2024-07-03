@@ -34,12 +34,12 @@ from .task_base import BaseTask
 
 
 class ArmTask(BaseTask):
-    def __init__(self, task_file='ur10.yml', robot_file='ur10_reacher.yml', world_file='collision_env.yml', tensor_args={'device':"cpu", 'dtype':torch.float32}, idx=0):
+    def __init__(self, task_file='ur10.yml', robot_file='ur10_reacher.yml', world_file='collision_env.yml', tensor_args={'device':"cpu", 'dtype':torch.float32}, idx=0, sd=0):
 
         super().__init__(tensor_args=tensor_args)
         
         
-        self.controller = self.init_mppi(task_file, robot_file, world_file)
+        self.controller = self.init_mppi(task_file, robot_file, world_file, sd=sd)
         self.init_aux(idx=idx)
         self.changed_mppi_params = dict()
 
@@ -47,7 +47,7 @@ class ArmTask(BaseTask):
         rollout_fn = ArmBase(**kwargs)
         return rollout_fn
 
-    def init_mppi(self, task_file, robot_file, collision_file):
+    def init_mppi(self, task_file, robot_file, collision_file, sd=0):
         robot_yml = join_path(get_gym_configs_path(), robot_file)
         
         with open(robot_yml) as file:
@@ -62,7 +62,7 @@ class ArmTask(BaseTask):
         with open(mpc_yml_file) as file:
             exp_params = yaml.load(file, Loader=yaml.FullLoader)
         exp_params['robot_params'] = exp_params['model'] #robot_params
-        
+        exp_params['mppi']['sample_params']['seed'] = sd
         
         rollout_fn = self.get_rollout_fn(exp_params=exp_params, tensor_args=self.tensor_args, world_params=world_params)
         
