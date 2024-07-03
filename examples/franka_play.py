@@ -88,8 +88,8 @@ def mpc_robot_interactive(args):
 
     mpc_control = ReacherTask(task_file, robot_file, world_file, tensor_args)
 
-    x_des = recorded_data['x_des']
-    mpc_control.update_params(goal_state=x_des)
+    x_pos, x_q = recorded_data['x_des']
+    mpc_control.update_params(goal_ee_pos=x_pos, goal_ee_quat=x_q)
 
     sim_dt = mpc_control.exp_params['control_dt']
     assert sim_dt == recorded_data['sim_dt']
@@ -120,6 +120,11 @@ def mpc_robot_interactive(args):
         goal_pose = goal_pose_lst[i]
         if goal_pose is not None:
             g_pos, g_q = goal_pose
+            print('goal_pose', end=' ')
+            [print(f'{x:.7f}', end=',') for x in g_pos]
+            print('--', end='')
+            [print(f'{x:.7f}', end=',') for x in g_q]
+            print('')
             mpc_control.update_params(goal_ee_pos=g_pos,
                                       goal_ee_quat=g_q)
 
@@ -131,12 +136,12 @@ def mpc_robot_interactive(args):
         q_des_target = copy.deepcopy((command_lst[i])['position'])
 
         # print(f'i:{i} recorded and computed q_des\n\t{q_des_target}\n\t{q_des}')
-        # cmd_error = (q_des_target - q_des)
-        # cmd_error_ratio = abs(cmd_error / q_des_target)*100
-        # if sum(cmd_error_ratio>5):
-        #     print(f'step: {i} error:', end='\t[')
-        #     [print(f' {e:.2f} ', end='') for e in cmd_error_ratio]
-        #     print(']')
+        cmd_error = (q_des_target - q_des)
+        cmd_error_ratio = abs(cmd_error / q_des_target)*100
+        if sum(cmd_error_ratio>5):
+            print(f'step: {i} error:', end='\t[')
+            [print(f' {e:.2f} ', end='') for e in cmd_error_ratio]
+            print(']')
     print(f'Recorded length: {recorded_length}')
     print('End')
 

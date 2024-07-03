@@ -161,8 +161,8 @@ def mpc_evaluate(param_dict, idx=0):
     mpc_control = ReacherTask(task_file, robot_file, world_file, tensor_args, idx=idx)
     change_params(mpc_control, param_dict)
 
-    x_des = recorded_data['x_des']
-    mpc_control.update_params(goal_state=x_des)
+    x_pos, x_q = recorded_data['x_des']
+    mpc_control.update_params(goal_ee_pos=x_pos, goal_ee_quat=x_q)
 
     sim_dt = mpc_control.exp_params['control_dt']
     assert sim_dt == recorded_data['sim_dt']
@@ -207,8 +207,8 @@ if __name__ == '__main__':
 
     opts = cma.CMAOptions()
     opts['tolfun'] = 1e-5
-    opts['popsize'] = 12
-    opts['maxiter'] = ndim * 100
+    opts['popsize'] = 2#6
+    opts['maxiter'] = 2#ndim * 100
     opts['bounds'] = [0, 10]
 
     es = cma.CMAEvolutionStrategy(init_param, 2, opts)

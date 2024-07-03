@@ -113,11 +113,38 @@ def mpc_robot_interactive(args, gym_instance):
     world_instance = World(gym, sim, env_ptr, world_params, w_T_r=w_T_r)
 
     mpc_control = ReacherTask(task_file, robot_file, world_file, tensor_args)
+    # param 1
+    p1 = {'goal_pose': {'weight':[15.0, 1500.0]}, 'primitive_collision': {'weight':500.0},
+          'manipulability': {'weight':30.0}, 'stop_cost': {'weight':150.0}}
+    p2 = {'goal_pose': {'weight': [5.0, 100.0]}, 'primitive_collision': {'weight': 10000.0},
+          'manipulability': {'weight': 0.10}, 'stop_cost': {'weight': 10.0}}
+    mpc_control.controller.rollout_fn.change_cost_params(p2)
 
     x_des = np.array([-0.3, 0.3, 0.2, -2.0, 0.0, 2.4,0.0,
                                 0.0,0.0,0.0,0.0,0.0,0.0,0.0])
-    mpc_control.update_params(goal_state=x_des)
-    record_data['x_des'] = x_des
+    # mpc_control.update_params(goal_state=x_des)
+
+    x_pos = np.array([0.0, 0.0, 0.0])
+    x_q = np.array([0.0, 0.0, 0.0, 0.0])
+    target_mug_pose = gymapi.Transform()
+    target_mug_pose.p = gymapi.Vec3(-0.65, 1.25, 0.1)
+    # target_mug_pose.r = gymapi.Quat(0.7071, 0.0, 0.7071, 0.0)
+    # target_mug_pose.r = gymapi.Quat(0.5, -0.5, 0.5, 0.5)
+    target_mug_pose.r = gymapi.Quat(0.7071, 0.0, 0.0, 0.7071)
+    # target_mug_pose.r = gymapi.Quat(1.0, 0.0, 0.0, 0.0)
+    target_mug_pose = copy.deepcopy(w_T_r.inverse() * target_mug_pose)
+
+    x_pos[0] = target_mug_pose.p.x
+    x_pos[1] = target_mug_pose.p.y
+    x_pos[2] = target_mug_pose.p.z
+    x_q[1] = target_mug_pose.r.x
+    x_q[2] = target_mug_pose.r.y
+    x_q[3] = target_mug_pose.r.z
+    x_q[0] = target_mug_pose.r.w
+
+    mpc_control.update_params(goal_ee_pos=x_pos, goal_ee_quat=x_q)
+
+    record_data['x_des'] = [x_pos, x_q]
 
     # spawn objects
     object_pose = gymapi.Transform()
@@ -134,14 +161,14 @@ def mpc_robot_interactive(args, gym_instance):
         object_pose.r = gymapi.Quat(0, 0, 0, 1)
 
         # goal mug
-        obj_asset_file = "urdf/mug/movable_mug.urdf"
+        obj_asset_file = "urdf/mug/mug.urdf"
         obj_asset_root = get_assets_path()
 
         target_object = world_instance.spawn_object(obj_asset_file, obj_asset_root, object_pose, color=tray_color, name='ee_target_object')
         obj_base_handle = gym.get_actor_rigid_body_handle(env_ptr, target_object, 0)
-        obj_body_handle = gym.get_actor_rigid_body_handle(env_ptr, target_object, 6)
+        # obj_body_handle = gym.get_actor_rigid_body_handle(env_ptr, target_object, 6)
         gym.set_rigid_body_color(env_ptr, target_object, 0, gymapi.MESH_VISUAL_AND_COLLISION, tray_color)
-        gym.set_rigid_body_color(env_ptr, target_object, 6, gymapi.MESH_VISUAL_AND_COLLISION, tray_color)
+        # gym.set_rigid_body_color(env_ptr, target_object, 6, gymapi.MESH_VISUAL_AND_COLLISION, tray_color)
 
         # ee mug
         obj_asset_file = "urdf/mug/mug.urdf"
@@ -191,11 +218,12 @@ def mpc_robot_interactive(args, gym_instance):
     while (i > -100):
         try:
             gym_instance.step()
+            if(i==0): input("\nPress Enter...\n")
             # print(f'step {i}')
             # if i == 100: mpc_control.change_horizon(40)
             record_goal_pose = None
             if (vis_ee_target):
-                pose = copy.deepcopy(world_instance.get_pose(obj_body_handle))
+                pose = copy.deepcopy(world_instance.get_pose(obj_base_handle))
                 pose = copy.deepcopy(w_T_r.inverse() * pose)
 
                 if (np.linalg.norm(g_pos - np.ravel([pose.p.x, pose.p.y, pose.p.z])) > 0.00001 or (
@@ -281,7 +309,7 @@ def mpc_robot_interactive(args, gym_instance):
 
     print('======END=======')
     mpc_control.close()
-    torch.save(record_data, 'record_data')
+    # torch.save(record_data, 'record_data_loss_test1')
     # record_data_loaded = torch.load('record_data')
     # print('For the reccorded data')
     #
