@@ -61,9 +61,9 @@ from storm_kit.util_file import get_mpc_configs_path as mpc_configs_path
 from storm_kit.differentiable_robot_model.coordinate_transform import quaternion_to_matrix, CoordinateTransform
 from storm_kit.mpc.task.reacher_task import ReacherTask
 np.set_printoptions(precision=2)
+logg = []
 
-
-def mpc_robot_interactive(args, gym_instance, seed_val=0):
+def mpc_robot_interactive(args, gym_instance, seed_val_list=None):
     vis_ee_target = False
     gym = gym_instance.gym
     sim = gym_instance.sim
@@ -103,95 +103,117 @@ def mpc_robot_interactive(args, gym_instance, seed_val=0):
 
     world_instance = World(gym, sim, env_ptr, world_params, w_T_r=w_T_r)
 
-    mpc_control = ReacherTask(task_file, robot_file, world_file, tensor_args, sd=seed_val)
-    # param 1
-    p1 = {'goal_pose': {'weight':[15.0, 1500.0]}, 'primitive_collision': {'weight':500.0},
-          'manipulability': {'weight':30.0}, 'stop_cost': {'weight':150.0}}
-    p2 = {'goal_pose': {'weight': [5.0, 100.0]}, 'primitive_collision': {'weight': 10000.0},
-          'manipulability': {'weight': 0.10}, 'stop_cost': {'weight': 10.0}}
-    mpc_control.controller.rollout_fn.change_cost_params(p2)
+    ee_pose_seq_list = []
+    initial_state = copy.deepcopy(gym.get_sim_rigid_body_states(sim, gymapi.STATE_ALL))
+    torch.save(initial_state, 'initial_state.p')
 
-    # Set the Target Pose
-    x_pos = np.array([0.0, 0.0, 0.0])
-    x_q = np.array([0.0, 0.0, 0.0, 0.0])
-    target_mug_pose = gymapi.Transform()
-    target_mug_pose.p = gymapi.Vec3(-0.65, 1.25, 0.1)
-    target_mug_pose.r = gymapi.Quat(0.7071, 0.0, 0.0, 0.7071)
-    target_mug_pose = copy.deepcopy(w_T_r.inverse() * target_mug_pose)
+    for h in range(len(seed_val_list)):
+        # init_time = gym_instance.get_sim_time()
+        mpc_control = ReacherTask(task_file, robot_file, world_file, tensor_args, sd=seed_val_list[h])
+        # param 1
+        p1 = {'goal_pose': {'weight':[15.0, 1500.0]}, 'primitive_collision': {'weight':500.0},
+              'manipulability': {'weight':30.0}, 'stop_cost': {'weight':150.0}}
+        p2 = {'goal_pose': {'weight': [5.0, 100.0]}, 'primitive_collision': {'weight': 10000.0},
+              'manipulability': {'weight': 0.10}, 'stop_cost': {'weight': 10.0}}
+        mpc_control.controller.rollout_fn.change_cost_params(p2)
 
-    x_pos[0] = target_mug_pose.p.x
-    x_pos[1] = target_mug_pose.p.y
-    x_pos[2] = target_mug_pose.p.z
-    x_q[1] = target_mug_pose.r.x
-    x_q[2] = target_mug_pose.r.y
-    x_q[3] = target_mug_pose.r.z
-    x_q[0] = target_mug_pose.r.w
+        # Set the Target Pose
+        x_pos = np.array([0.0, 0.0, 0.0])
+        x_q = np.array([0.0, 0.0, 0.0, 0.0])
+        target_mug_pose = gymapi.Transform()
+        target_mug_pose.p = gymapi.Vec3(-0.65, 1.25, 0.1)
+        target_mug_pose.r = gymapi.Quat(0.7071, 0.0, 0.0, 0.7071)
+        target_mug_pose = copy.deepcopy(w_T_r.inverse() * target_mug_pose)
 
-    mpc_control.update_params(goal_ee_pos=x_pos, goal_ee_quat=x_q)
+        x_pos[0] = target_mug_pose.p.x
+        x_pos[1] = target_mug_pose.p.y
+        x_pos[2] = target_mug_pose.p.z
+        x_q[1] = target_mug_pose.r.x
+        x_q[2] = target_mug_pose.r.y
+        x_q[3] = target_mug_pose.r.z
+        x_q[0] = target_mug_pose.r.w
 
-    w_T_robot = torch.eye(4)
-    quat = torch.tensor([w_T_r.r.w, w_T_r.r.x, w_T_r.r.y, w_T_r.r.z]).unsqueeze(0)
-    rot = quaternion_to_matrix(quat)
-    w_T_robot[0, 3] = w_T_r.p.x
-    w_T_robot[1, 3] = w_T_r.p.y
-    w_T_robot[2, 3] = w_T_r.p.z
-    w_T_robot[:3, :3] = rot[0]
+        mpc_control.update_params(goal_ee_pos=x_pos, goal_ee_quat=x_q)
 
-    w_robot_coord = CoordinateTransform(trans=w_T_robot[0:3, 3].unsqueeze(0),
-                                        rot=w_T_robot[0:3, 0:3].unsqueeze(0))
+        w_T_robot = torch.eye(4)
+        quat = torch.tensor([w_T_r.r.w, w_T_r.r.x, w_T_r.r.y, w_T_r.r.z]).unsqueeze(0)
+        rot = quaternion_to_matrix(quat)
+        w_T_robot[0, 3] = w_T_r.p.x
+        w_T_robot[1, 3] = w_T_r.p.y
+        w_T_robot[2, 3] = w_T_r.p.z
+        w_T_robot[:3, :3] = rot[0]
 
-    sim_dt = mpc_control.exp_params['control_dt']
-    t_step = gym_instance.get_sim_time()
+        w_robot_coord = CoordinateTransform(trans=w_T_robot[0:3, 3].unsqueeze(0),
+                                            rot=w_T_robot[0:3, 0:3].unsqueeze(0))
 
-    ee_pose_seq = []
-    last_ee_pose = None
-    lase_ee_pose_update = time.time()
-    sim_start_time = time.time()
-    i = 0
-    while (i > -100):
-        try:
-            if (time.time() - sim_start_time) > 210:
-                print('\n\n Simulation is taking too long .. Stopping...')
+        sim_dt = mpc_control.exp_params['control_dt']
+        t_step = 0.0#gym_instance.get_sim_time() - init_time
+
+        # print(f'\n\ngym_instance.get_sim_time(): {gym_instance.get_sim_time()}\n\n')
+        # print(f'\n\nt_step: {t_step:.9f}\n\n')
+
+        # logg.append(initial_state)
+        ee_pose_seq = []
+        last_ee_pose = None
+        lase_ee_pose_update = time.time()
+        sim_start_time = time.time()
+        i = 0
+        while (i > -100):
+            try:
+                if (time.time() - sim_start_time) > 210:
+                    print('\n\n Simulation is taking too long .. Stopping...')
+                    break
+                if(time.time() - lase_ee_pose_update) > 30:
+                    print('\n\n Robot is not moving.. Stopping...')
+                    break
+                gym_instance.step()
+                # if(i==0): input("\nPress Enter...\n")
+                t_step += sim_dt
+
+                current_robot_state = copy.deepcopy(robot_sim.get_state(env_ptr, robot_ptr))
+                if i==0:
+                    print('\n\n\n\n\nCurr\n')
+                    print(current_robot_state)
+                    logg.append(copy.deepcopy(current_robot_state))
+
+                command = mpc_control.get_command(t_step, current_robot_state, control_dt=sim_dt, WAIT=True)
+                q_des = copy.deepcopy(command['position'])
+
+                curr_state = np.hstack((current_robot_state['position'], current_robot_state['velocity'], current_robot_state['acceleration']))
+                curr_state_tensor = torch.as_tensor(curr_state, **tensor_args).unsqueeze(0)
+                pose_state = mpc_control.controller.rollout_fn.get_ee_pose(curr_state_tensor)
+                e_pos = np.ravel(pose_state['ee_pos_seq'].cpu().numpy())
+                e_quat = np.ravel(pose_state['ee_quat_seq'].cpu().numpy())
+                ee_pose_seq.append(copy.deepcopy(e_pos))
+
+                dist = 0
+                if last_ee_pose is not None:
+                    dist = np.linalg.norm(e_pos - last_ee_pose)
+                if (last_ee_pose is None) or dist > 0.025:
+                    print(f'Updating dist{dist:.7f}')
+                    last_ee_pose = e_pos
+                    lase_ee_pose_update = time.time()
+
+                robot_sim.command_robot_position(q_des, env_ptr, robot_ptr)
+                i+=1
+
+            except KeyboardInterrupt:
+                print('Closing')
                 break
-            if(time.time() - lase_ee_pose_update) > 30:
-                print('\n\n Robot is not moving.. Stopping...')
-                break
-            gym_instance.step()
-            # if(i==0): input("\nPress Enter...\n")
-            t_step += sim_dt
 
-            current_robot_state = copy.deepcopy(robot_sim.get_state(env_ptr, robot_ptr))
+        ee_pose_seq = torch.tensor(ee_pose_seq).to('cpu')
+        ee_pose_seq = w_robot_coord.transform_point(ee_pose_seq)
+        ee_pose_seq_list.append(ee_pose_seq)
 
-            command = mpc_control.get_command(t_step, current_robot_state, control_dt=sim_dt, WAIT=True)
-            q_des = copy.deepcopy(command['position'])
+        mpc_control.close()
+        del mpc_control
 
-            curr_state = np.hstack((current_robot_state['position'], current_robot_state['velocity'], current_robot_state['acceleration']))
-            curr_state_tensor = torch.as_tensor(curr_state, **tensor_args).unsqueeze(0)
-            pose_state = mpc_control.controller.rollout_fn.get_ee_pose(curr_state_tensor)
-            e_pos = np.ravel(pose_state['ee_pos_seq'].cpu().numpy())
-            e_quat = np.ravel(pose_state['ee_quat_seq'].cpu().numpy())
-            ee_pose_seq.append(copy.deepcopy(e_pos))
+        init_state = torch.load('initial_state.p')
+        gym.set_sim_rigid_body_states(sim, init_state, gymapi.STATE_ALL)
+        gym_instance.step1()
+        gym_instance.step()
 
-            dist = 0
-            if last_ee_pose is not None:
-                dist = np.linalg.norm(e_pos - last_ee_pose)
-            if (last_ee_pose is None) or dist > 0.025:
-                print(f'Updating dist{dist:.7f}')
-                last_ee_pose = e_pos
-                lase_ee_pose_update = time.time()
-
-            robot_sim.command_robot_position(q_des, env_ptr, robot_ptr)
-            i+=1
-
-        except KeyboardInterrupt:
-            print('Closing')
-            break
-
-    ee_pose_seq = torch.tensor(ee_pose_seq).to('cpu')
-    ee_pose_seq = w_robot_coord.transform_point(ee_pose_seq)
-
-    mpc_control.close()
-    return ee_pose_seq
+    return ee_pose_seq_list
 
 
 if __name__ == '__main__':
@@ -212,16 +234,16 @@ if __name__ == '__main__':
     # with open('ee_pos_mod23.npy', 'wb') as f:
     # np.save(f, ee_traj)
 
-    seed_val_list = [17, 8]
-    ee_traj_seq = []
+    seed_val_list = [17, 17]
     gym_instance = Gym(**sim_params)
-    for i in range(1):
-        print(f'Iteration {i+1}, seed value {seed_val_list[i]}')
-        ee_traj = mpc_robot_interactive(args, gym_instance, seed_val=seed_val_list[i])
-        ee_traj_seq.append(ee_traj)
-        print(f'Traj length {ee_traj.shape[0]}')
-        # del gym_instance
+
+    ee_traj_list = mpc_robot_interactive(args, gym_instance, seed_val_list=seed_val_list)
+
+    print('==^^^^====')
+
+    for k in logg:
+        print(k)
 
     # save the data
-    with open('ee_traj_seq.npy', 'wb') as f:
-        np.save(f, ee_traj_seq)
+    # with open('ee_traj_seq.npy', 'wb') as f:
+    #     np.save(f, ee_traj_list)
