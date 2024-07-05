@@ -106,14 +106,62 @@ def mpc_robot_interactive(args, gym_instance):
 
     world_instance = World(gym, sim, env_ptr, world_params, w_T_r=w_T_r)
 
-    ee_pose_seq = np.load('ee_pos.npy')
+    # ee_pose_seq = np.load('ee_pos.npy')
+    #
+    # color = np.array([1.0, 0.0, 0.0])
+    # while(True):
+    #     try:
+    #         gym_instance.step()
+    #         gym_instance.clear_lines()
+    #         gym_instance.draw_lines(ee_pose_seq, color=color)
+    #         if vis_robot: robot_sim.command_robot_position(init_state, env_ptr, robot_ptr)
+    #     except KeyboardInterrupt:
+    #         print('close')
+    #         break
 
-    color = np.array([1.0, 0.0, 0.0])
+    # ori_ee = np.load('ee_pos_orip2.npy')
+    # mod_ee = np.load('ee_pos_mod23.npy')
+    #
+    # print(f'\n\n\nori shape {ori_ee.shape}')
+    # print(f'\n\n\nmod shape {mod_ee.shape}')
+    #
+    # ee_traj_len = min(ori_ee.shape[0], mod_ee.shape[0])
+    #
+    # err_L = []
+    #
+    # for i in range(ee_traj_len):
+    #     err = ori_ee[i] - mod_ee[i]
+    #     err_L.append(err)
+    #
+    # loss = np.sum(err_L, axis=0)
+    # print(f' error {loss}')
+
+
+    ee_traj_seq = np.load('ee_traj_seq.npy', allow_pickle=True)
+    traj1 = ee_traj_seq[0].numpy()
+    traj2 = ee_traj_seq[1].numpy()
+    # print(type(traj1), type(traj1), traj1.shape, traj2.shape)
+    err_L = []
+    traj_len = min(traj1.shape[0], traj2.shape[0])
+    for i in range(traj_len):
+        err = traj1[i] - traj2[i]
+        err = err**2
+        err_L.append(err)
+        [print(f'{e:.7f}', end=' ') for e in err]
+        print('')
+
+    # print(err_L)
+    loss = np.sum(err_L, axis=0)
+    print(f' error {loss}')
+
+    color1 = np.array([1.0, 0.0, 0.0])
+    color2 = np.array([0.0, 1.0, 0.0])
     while(True):
         try:
             gym_instance.step()
             gym_instance.clear_lines()
-            gym_instance.draw_lines(ee_pose_seq, color=color)
+            gym_instance.draw_lines(traj1, color=color1)
+            gym_instance.draw_lines(traj2, color=color2)
             if vis_robot: robot_sim.command_robot_position(init_state, env_ptr, robot_ptr)
         except KeyboardInterrupt:
             print('close')
