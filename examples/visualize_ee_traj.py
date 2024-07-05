@@ -151,6 +151,7 @@ def mpc_robot_interactive(args, gym_instance):
         print('')
 
     # print(err_L)
+    print(f'traj1:{traj1.shape[0]}, traj2:{traj2.shape[0]}')
     loss = np.sum(err_L, axis=0)
     print(f' error {loss}')
 
