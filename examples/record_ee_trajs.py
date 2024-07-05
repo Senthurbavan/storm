@@ -61,7 +61,6 @@ from storm_kit.util_file import get_mpc_configs_path as mpc_configs_path
 from storm_kit.differentiable_robot_model.coordinate_transform import quaternion_to_matrix, CoordinateTransform
 from storm_kit.mpc.task.reacher_task import ReacherTask
 np.set_printoptions(precision=2)
-logg = []
 
 def mpc_robot_interactive(args, gym_instance, seed_val=0, param_config='p1'):
     gym = gym_instance.gym
@@ -142,6 +141,7 @@ def mpc_robot_interactive(args, gym_instance, seed_val=0, param_config='p1'):
     sim_dt = mpc_control.exp_params['control_dt']
     t_step = gym_instance.get_sim_time()
 
+    robot_state_seq = []
     ee_pose_seq = []
     last_ee_pose = None
     lase_ee_pose_update = time.time()
@@ -159,10 +159,6 @@ def mpc_robot_interactive(args, gym_instance, seed_val=0, param_config='p1'):
             t_step += sim_dt
 
             current_robot_state = copy.deepcopy(robot_sim.get_state(env_ptr, robot_ptr))
-            if i==0:
-                print('\n\n\n\n\nCurr\n')
-                print(current_robot_state)
-                logg.append(copy.deepcopy(current_robot_state))
 
             command = mpc_control.get_command(t_step, current_robot_state, control_dt=sim_dt, WAIT=True)
             q_des = copy.deepcopy(command['position'])
@@ -173,6 +169,7 @@ def mpc_robot_interactive(args, gym_instance, seed_val=0, param_config='p1'):
             e_pos = np.ravel(pose_state['ee_pos_seq'].cpu().numpy())
             e_quat = np.ravel(pose_state['ee_quat_seq'].cpu().numpy())
             ee_pose_seq.append(copy.deepcopy(e_pos))
+            robot_state_seq.append(copy.deepcopy(current_robot_state))
 
             dist = 0
             if last_ee_pose is not None:
@@ -196,8 +193,9 @@ def mpc_robot_interactive(args, gym_instance, seed_val=0, param_config='p1'):
     del mpc_control
 
     res_dict = {'param':param_config,
-                  'seed':seed_val,
-                  'ee_pose_seq':ee_pose_seq}
+                'seed':seed_val,
+                'ee_pose_seq':ee_pose_seq,
+                'robot_state_seq': robot_state_seq}
     return res_dict
 
 
@@ -213,7 +211,7 @@ if __name__ == '__main__':
     sim_params = load_yaml(join_path(get_gym_configs_path(), 'physx.yml'))
     sim_params['headless'] = args.headless
 
-    seed_val_list = [17, 82]
+    seed_val_list = [833, 63946]
     param_config = 'p1'
     ee_traj_seq = np.empty(len(seed_val_list), dtype=object)
     for i in range(len(seed_val_list)):
