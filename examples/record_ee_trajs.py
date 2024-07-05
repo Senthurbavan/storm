@@ -63,7 +63,7 @@ from storm_kit.mpc.task.reacher_task import ReacherTask
 np.set_printoptions(precision=2)
 logg = []
 
-def mpc_robot_interactive(args, gym_instance, seed_val=0):
+def mpc_robot_interactive(args, gym_instance, seed_val=0, param_config='p1'):
     gym = gym_instance.gym
     sim = gym_instance.sim
 
@@ -108,7 +108,7 @@ def mpc_robot_interactive(args, gym_instance, seed_val=0):
           'manipulability': {'weight':30.0}, 'stop_cost': {'weight':150.0}}
     p2 = {'goal_pose': {'weight': [5.0, 100.0]}, 'primitive_collision': {'weight': 10000.0},
           'manipulability': {'weight': 0.10}, 'stop_cost': {'weight': 10.0}}
-    mpc_control.controller.rollout_fn.change_cost_params(p2)
+    mpc_control.controller.rollout_fn.change_cost_params(p1 if param_config=='p1' else p2)
 
     # Set the Target Pose
     x_pos = np.array([0.0, 0.0, 0.0])
@@ -195,7 +195,10 @@ def mpc_robot_interactive(args, gym_instance, seed_val=0):
     mpc_control.close()
     del mpc_control
 
-    return ee_pose_seq
+    res_dict = {'param':param_config,
+                  'seed':seed_val,
+                  'ee_pose_seq':ee_pose_seq}
+    return res_dict
 
 
 if __name__ == '__main__':
@@ -210,18 +213,20 @@ if __name__ == '__main__':
     sim_params = load_yaml(join_path(get_gym_configs_path(), 'physx.yml'))
     sim_params['headless'] = args.headless
 
-    seed_val_list = [17, 8]
-    ee_traj_seq = np.empty(2, dtype=object)
+    seed_val_list = [17, 82]
+    param_config = 'p1'
+    ee_traj_seq = np.empty(len(seed_val_list), dtype=object)
     for i in range(len(seed_val_list)):
         print(f'Iteration {i + 1}, seed value {seed_val_list[i]}')
         gym_instance = Gym(**sim_params)
-        ee_traj = mpc_robot_interactive(args, gym_instance, seed_val=seed_val_list[i])
+        ee_traj = mpc_robot_interactive(args, gym_instance, seed_val=seed_val_list[i],
+                                        param_config=param_config)
         ee_traj_seq[i] = copy.deepcopy(ee_traj)
-        print(f'Traj length {ee_traj.shape[0]}')
+        print(f"Traj length {ee_traj['ee_pose_seq'].shape[0]}")
         gym_instance.gym.destroy_viewer(gym_instance.viewer)
         gym_instance.gym.destroy_sim(gym_instance.sim)
         del gym_instance
 
     # save the data
-    with open('ee_traj_seq.npy', 'wb') as f:
+    with open(f'ee_traj_seq_{param_config}.npy', 'wb') as f:
         np.save(f, ee_traj_seq)

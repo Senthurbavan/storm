@@ -137,9 +137,9 @@ def mpc_robot_interactive(args, gym_instance):
     # print(f' error {loss}')
 
 
-    ee_traj_seq = np.load('ee_traj_seq.npy', allow_pickle=True)
-    traj1 = ee_traj_seq[0].numpy()
-    traj2 = ee_traj_seq[1].numpy()
+    ee_traj_seq = np.load('ee_traj_seq_p1.npy', allow_pickle=True)
+    traj1 = ee_traj_seq[0]['ee_pose_seq'].numpy()
+    traj2 = ee_traj_seq[1]['ee_pose_seq'].numpy()
     # print(type(traj1), type(traj1), traj1.shape, traj2.shape)
     err_L = []
     traj_len = min(traj1.shape[0], traj2.shape[0])
@@ -147,13 +147,14 @@ def mpc_robot_interactive(args, gym_instance):
         err = traj1[i] - traj2[i]
         err = err**2
         err_L.append(err)
-        [print(f'{e:.7f}', end=' ') for e in err]
-        print('')
+        # [print(f'{e:.7f}', end=' ') for e in err]
+        # print('')
+    err_mat = np.sum((traj1[:traj_len] - traj2[:traj_len])**2, axis=0)
 
     # print(err_L)
     print(f'traj1:{traj1.shape[0]}, traj2:{traj2.shape[0]}')
     loss = np.sum(err_L, axis=0)
-    print(f' error {loss}')
+    print(f' error {loss}, {err_mat}')
 
     color1 = np.array([1.0, 0.0, 0.0])
     color2 = np.array([0.0, 1.0, 0.0])
