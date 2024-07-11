@@ -35,7 +35,8 @@ torch.backends.cuda.matmul.allow_tf32 = True
 torch.backends.cudnn.allow_tf32 = True
 #
 
-
+import os
+import glob
 
 import matplotlib
 matplotlib.use('tkagg')
@@ -137,34 +138,111 @@ def mpc_robot_interactive(args, gym_instance):
     # print(f' error {loss}')
 
 
-    ee_traj_seq = np.load('ee_traj_seq_p1.npy', allow_pickle=True)
-    traj1 = ee_traj_seq[0]['ee_pose_seq'].numpy()
-    traj2 = ee_traj_seq[1]['ee_pose_seq'].numpy()
-    # print(type(traj1), type(traj1), traj1.shape, traj2.shape)
-    err_L = []
-    traj_len = min(traj1.shape[0], traj2.shape[0])
-    for i in range(traj_len):
-        err = traj1[i] - traj2[i]
-        err = err**2
-        err_L.append(err)
-        # [print(f'{e:.7f}', end=' ') for e in err]
-        # print('')
-    err_mat = np.sum((traj1[:traj_len] - traj2[:traj_len])**2, axis=0)
+    # ee_traj_seq = np.load('ee_traj_seq_p1.npy', allow_pickle=True)
+    # traj1 = ee_traj_seq[0]['ee_pose_seq'].numpy()
+    # traj2 = ee_traj_seq[1]['ee_pose_seq'].numpy()
+    # # print(type(traj1), type(traj1), traj1.shape, traj2.shape)
+    # err_L = []
+    # traj_len = min(traj1.shape[0], traj2.shape[0])
+    # for i in range(traj_len):
+    #     err = traj1[i] - traj2[i]
+    #     err = err**2
+    #     err_L.append(err)
+    #     # [print(f'{e:.7f}', end=' ') for e in err]
+    #     # print('')
+    # err_mat = np.sum((traj1[:traj_len] - traj2[:traj_len])**2, axis=0)
+    #
+    # # print(err_L)
+    # print(f'traj1:{traj1.shape[0]}, traj2:{traj2.shape[0]}')
+    # loss = np.sum(err_L, axis=0)
+    # print(f' error {loss}, {err_mat}')
+    #
+    # color1 = np.array([1.0, 0.0, 0.0])
+    # color2 = np.array([0.0, 1.0, 0.0])
+    # while(True):
+    #     try:
+    #         gym_instance.step()
+    #         gym_instance.clear_lines()
+    #         gym_instance.draw_lines(traj1, color=color1)
+    #         gym_instance.draw_lines(traj2, color=color2)
+    #         if vis_robot: robot_sim.command_robot_position(init_state, env_ptr, robot_ptr)
+    #     except KeyboardInterrupt:
+    #         print('close')
+    #         break
 
-    # print(err_L)
-    print(f'traj1:{traj1.shape[0]}, traj2:{traj2.shape[0]}')
-    loss = np.sum(err_L, axis=0)
-    print(f' error {loss}, {err_mat}')
+    # Find all param paths
+    p1_files = glob.glob("ee_traj_seq_p1_*")
+    p2_files = glob.glob("ee_traj_seq_p2_*")
+    p3_files = glob.glob("ee_traj_seq_p3_*")
+    p4_files = glob.glob("ee_traj_seq_p4_*")
 
-    color1 = np.array([1.0, 0.0, 0.0])
-    color2 = np.array([0.0, 1.0, 0.0])
+    print(p4_files)
+
+    # Load and combine the dicts for each param
+    ee_trajs_p1_data = []
+    ee_trajs_p2_data = []
+    ee_trajs_p3_data = []
+    ee_trajs_p4_data = []
+
+    for file in p1_files:
+        ee_traj_seq = np.load(file, allow_pickle=True)
+        ee_trajs_p1_data.extend(ee_traj_seq)
+
+    for file in p2_files:
+        ee_traj_seq = np.load(file, allow_pickle=True)
+        ee_trajs_p2_data.extend(ee_traj_seq)
+
+    for file in p3_files:
+        ee_traj_seq = np.load(file, allow_pickle=True)
+        ee_trajs_p3_data.extend(ee_traj_seq)
+
+    for file in p4_files:
+        ee_traj_seq = np.load(file, allow_pickle=True)
+        ee_trajs_p4_data.extend(ee_traj_seq)
+
+    # Extract the ee_pos and state_seq
+    ee_traj_list_p1 = []
+    ee_traj_list_p2 = []
+    ee_traj_list_p3 = []
+    ee_traj_list_p4 = []
+
+    for traj_dict in ee_trajs_p1_data:
+        ee_traj_list_p1.append(traj_dict['ee_pose_seq'].numpy())
+
+    for traj_dict in ee_trajs_p2_data:
+        ee_traj_list_p2.append(traj_dict['ee_pose_seq'].numpy())
+
+    for traj_dict in ee_trajs_p3_data:
+        ee_traj_list_p3.append(traj_dict['ee_pose_seq'].numpy())
+
+    for traj_dict in ee_trajs_p4_data:
+        ee_traj_list_p4.append(traj_dict['ee_pose_seq'].numpy())
+
+    print(f'Number of parameter 1 traj: {len(ee_traj_list_p1)}')
+    print(f'Number of parameter 2 traj: {len(ee_traj_list_p2)}')
+    print(f'Number of parameter 3 traj: {len(ee_traj_list_p3)}')
+    print(f'Number of parameter 4 traj: {len(ee_traj_list_p4)}')
+    # # Plot the ee_pos traj
+    color1 = np.array([0.0, 1.0, 0.0])
+    color2 = np.array([1.0, 0.0, 0.0])
+    color3 = np.array([0.0, 0.0, 1.0])
+    color4 = np.array([0.0, 1.0, 1.0])
+    first = True
     while(True):
         try:
             gym_instance.step()
-            gym_instance.clear_lines()
-            gym_instance.draw_lines(traj1, color=color1)
-            gym_instance.draw_lines(traj2, color=color2)
-            if vis_robot: robot_sim.command_robot_position(init_state, env_ptr, robot_ptr)
+            if first:
+                gym_instance.clear_lines()
+                for traj1 in ee_traj_list_p1:
+                  gym_instance.draw_lines(traj1, color=color1)
+                for traj2 in ee_traj_list_p2:
+                  gym_instance.draw_lines(traj2, color=color2)
+                for traj3 in ee_traj_list_p3:
+                  gym_instance.draw_lines(traj3, color=color3)
+                for traj4 in ee_traj_list_p4:
+                  gym_instance.draw_lines(traj4, color=color4)
+                if vis_robot: robot_sim.command_robot_position(init_state, env_ptr, robot_ptr)
+            first = False
         except KeyboardInterrupt:
             print('close')
             break
