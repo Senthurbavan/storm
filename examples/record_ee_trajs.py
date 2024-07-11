@@ -107,7 +107,22 @@ def mpc_robot_interactive(args, gym_instance, seed_val=0, param_config='p1'):
           'manipulability': {'weight':30.0}, 'stop_cost': {'weight':150.0}}
     p2 = {'goal_pose': {'weight': [5.0, 100.0]}, 'primitive_collision': {'weight': 10000.0},
           'manipulability': {'weight': 0.10}, 'stop_cost': {'weight': 10.0}}
-    mpc_control.controller.rollout_fn.change_cost_params(p1 if param_config=='p1' else p2)
+    p3 = {'goal_pose': {'weight': [5.0, 100.0]}, 'primitive_collision': {'weight': 50000.0},
+          'manipulability': {'weight': 0.01}, 'stop_cost': {'weight': 1.0}}
+    p4 = {'goal_pose': {'weight': [5.0, 100.0]}, 'primitive_collision': {'weight': 10000.0},
+          'manipulability': {'weight': 0.10}, 'stop_cost': {'weight': 10.0}, }
+
+    print(f'mpc config param: {param_config}')
+    pc = None
+    if(param_config=='p1'):
+        pc = p1
+    elif param_config=='p2':
+        pc = p2
+    elif param_config == 'p3':
+        pc = p3
+    elif param_config == 'p4':
+        pc = p4
+    mpc_control.controller.rollout_fn.change_cost_params(pc)
 
     # Set the Target Pose
     x_pos = np.array([0.0, 0.0, 0.0])
@@ -211,9 +226,29 @@ if __name__ == '__main__':
     sim_params = load_yaml(join_path(get_gym_configs_path(), 'physx.yml'))
     sim_params['headless'] = args.headless
 
-    seed_val_list = [833, 63946]
-    param_config = 'p1'
+    # seed_val_list = [0, 8, 17, 25, 33, 44, 57, 61, 82, 99]
+    # seed_val_list = [122, 251, 264, 270, 299, 320, 370, 383, 395, 526, 535, 539, 540,
+    #                   589, 622, 687, 756, 777, 828, 862, 872, 921, 924, 926, 960]
+    # seed_val_list3 = [1120, 1220, 1247, 1497, 1524, 1638, 2012, 2053, 2167, 2433, 2435,
+    #                  2437, 2696, 2936, 3092, 3675, 3710, 4015, 4192, 4324, 4450, 4490,
+    #                  4551, 4555, 4568]
+
+    seed_val_list = [3675, 3710, 4015, 4192, 4324, 4450, 4490, 4551, 4555, 4568, 5077,
+                     5630, 6054, 6329, 6674, 7003, 7012, 7387, 7423, 7568, 8285, 8457,
+                     8539, 8880, 9102]
+
+    # seed_val_list4 = [5077, 5630, 6054, 6329, 6674, 7003, 7012, 7387, 7423, 7568, 8285,
+    #                  8457, 8539, 8880, 9102]
+
+    # seed_val_list5 = [10784, 11166, 18965, 19027, 19239, 21285, 21379, 21402, 29027,
+    #                  29982, 32333, 32455, 32571, 34187, 35712, 42263, 43019, 44780,
+    #                  45565, 48213, 48742, 48883, 49125, 49294, 49471]
+    # seed_val_list = [0, 8, 17]
+    # seed_val_list = [25]
+    param_config = 'p4'
     ee_traj_seq = np.empty(len(seed_val_list), dtype=object)
+    print(f'Param Config: {param_config} Starting')
+    seq_id = int(time.time())
     for i in range(len(seed_val_list)):
         print(f'Iteration {i + 1}, seed value {seed_val_list[i]}')
         gym_instance = Gym(**sim_params)
@@ -224,7 +259,11 @@ if __name__ == '__main__':
         gym_instance.gym.destroy_viewer(gym_instance.viewer)
         gym_instance.gym.destroy_sim(gym_instance.sim)
         del gym_instance
+        # save the data
+        print(f'Saving ee_traj_seq[{i}] Data')
+        with open(f'ee_traj_seq_{param_config}_{seq_id}.npy', 'wb') as f:
+            np.save(f, ee_traj_seq)
+        if i < len(seed_val_list)-1:
+            print(f'After iteration {i+1}, goint to sleep....')
+            time.sleep(60)
 
-    # save the data
-    with open(f'ee_traj_seq_{param_config}.npy', 'wb') as f:
-        np.save(f, ee_traj_seq)
