@@ -115,7 +115,7 @@ def mpc_robot_interactive(args, gym_instance):
           'manipulability': {'weight':30.0}, 'stop_cost': {'weight':150.0}}
     p2 = {'goal_pose': {'weight': [5.0, 100.0]}, 'primitive_collision': {'weight': 10000.0},
           'manipulability': {'weight': 0.10}, 'stop_cost': {'weight': 10.0}}
-    mpc_control.controller.rollout_fn.change_cost_params(p2)
+    mpc_control.controller.rollout_fn.change_cost_params(p1)
 
     x_pos = np.array([0.0, 0.0, 0.0])
     x_q = np.array([0.0, 0.0, 0.0, 0.0])

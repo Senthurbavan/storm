@@ -59,9 +59,11 @@ def mpc_robot_interactive(args, seed_val=0):
     mpc_control = ReacherTask(task_file, robot_file, world_file, tensor_args, sd=seed_val)
 
     # parameter
-    # p1 = {'goal_pose': {'weight': [15.0, 1500.0]}, 'primitive_collision': {'weight': 500.0},
-    #       'manipulability': {'weight': 30.0}, 'stop_cost': {'weight': 150.0}}
-    # mpc_control.controller.rollout_fn.change_cost_params(p1)
+    p1 = {'goal_pose': {'weight': [15.0, 1500.0]}, 'primitive_collision': {'weight': 500.0},
+          'manipulability': {'weight': 30.0}, 'stop_cost': {'weight': 150.0}}
+    # p2 = {'goal_pose': {'weight': [5.0, 100.0]}, 'primitive_collision': {'weight': 10000.0},
+    #       'manipulability': {'weight': 0.10}, 'stop_cost': {'weight': 10.0}}
+    mpc_control.controller.rollout_fn.change_cost_params(p1)
 
     x_pos, x_q = recorded_data['x_des']
     mpc_control.update_params(goal_ee_pos=x_pos, goal_ee_quat=x_q)
@@ -95,15 +97,15 @@ def mpc_robot_interactive(args, seed_val=0):
         current_robot_state = current_robot_state_lst[i]
 
         command = mpc_control.get_command(t_step, current_robot_state, control_dt=sim_dt, WAIT=True)
-        q_des = copy.deepcopy(command['position'])
-        q_des_target = copy.deepcopy((command_lst[i])['position'])
-
-        cmd_error = (q_des_target - q_des)
-        cmd_error_ratio = abs(cmd_error / q_des_target)*100
-        if sum(cmd_error_ratio>5):
-            print(f'step: {i} error:', end='\t[')
-            [print(f' {e:.2f} ', end='') for e in cmd_error_ratio]
-            print(']')
+        # q_des = copy.deepcopy(command['position'])
+        # q_des_target = copy.deepcopy((command_lst[i])['position'])
+        #
+        # cmd_error = (q_des_target - q_des)
+        # cmd_error_ratio = abs(cmd_error / q_des_target)*100
+        # if sum(cmd_error_ratio>5):
+        #     print(f'step: {i} error:', end='\t[')
+        #     [print(f' {e:.2f} ', end='') for e in cmd_error_ratio]
+        #     print(']')
 
         # get current pose
         curr_state = np.hstack((current_robot_state['position'], current_robot_state['velocity'], current_robot_state['acceleration']))
@@ -134,7 +136,9 @@ if __name__ == '__main__':
     parser.add_argument('--robot', type=str, default='franka', help='Robot to spawn')
     args = parser.parse_args()
 
-    seed_val_list = [25]
+    seed_val_list = [8, 17, 25, 33, 44, 57, 61, 82, 99, 122,
+                     251, 264, 270, 299, 320, 370, 383, 395, 526, 535,
+                     539, 540, 589, 622, 687]
     play_traj_seq = np.empty(len(seed_val_list), dtype=object)
     for i in range(len(seed_val_list)):
         play_traj = mpc_robot_interactive(args, seed_val=seed_val_list[i])

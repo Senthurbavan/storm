@@ -111,16 +111,19 @@ def mpc_robot_interactive(args, gym_instance):
     recorded_data = recorded_data[0]
 
     play_data = np.load('multi_seed_traj_output.npy', allow_pickle=True)
-    play_data = play_data[0]
+    # play_data = play_data[0]
 
     ee_traj = recorded_data['ee_pose_seq']
-    print(f"ee_traj len: {len(ee_traj)}")
     command_ee_traj = recorded_data['command_ee_pose_seq']
     recorded_w_T_r = recorded_data['w_T_r']
 
-    play_ee_traj = play_data['ee_pose_seq']
-    print(f"play_ee_traj len: {len(play_ee_traj)}")
-    command_play_ee_traj = play_data['command_ee_pose_seq']
+    play_ee_traj = [d['ee_pose_seq'] for d in play_data]
+    command_play_ee_traj = [d['command_ee_pose_seq'] for d in play_data]
+
+    print(f"play_ee_traj: {type(play_ee_traj)}, {len(play_ee_traj)}")
+    print(f"command_play_ee_traj: {type(command_play_ee_traj)}, {len(command_play_ee_traj)}")
+    print(f"play_ee_traj[0] : {type(play_ee_traj[0])}, {len(play_ee_traj[0])}")
+    print(f"command_play_ee_traj[0]: {type(command_play_ee_traj[0])}, {len(command_play_ee_traj[0])}")
 
     w_T_robot = torch.eye(4)
     quat = torch.tensor([w_T_r.r.w, w_T_r.r.x, w_T_r.r.y, w_T_r.r.z]).unsqueeze(0)
@@ -137,7 +140,9 @@ def mpc_robot_interactive(args, gym_instance):
           f'{w_T_r.r.x}, {w_T_r.r.y}, {w_T_r.r.z}, {w_T_r.r.w}')
     print(f'recorded w_T_r: \n{recorded_w_T_r}')
 
-    ee_pos_seq = np.vstack(np.array(ee_traj)[:, 0])
+    ee_pos_seq = np.stack(np.array(ee_traj)[:, 0])
+    print(f"ee_pos_seq shape: {ee_pos_seq.shape}")
+    print(f"ee_pos_seq[0], \n{ee_pos_seq[0]}")
     ee_pos_seq = torch.tensor(ee_pos_seq).to('cpu')
     ee_pos_seq = w_robot_coord.transform_point(ee_pos_seq)
 
@@ -147,15 +152,19 @@ def mpc_robot_interactive(args, gym_instance):
 
     command_delta = torch.stack((ee_pos_seq, command_ee_pos_seq), dim=1)
 
-    play_ee_pos_seq = np.vstack(np.array(play_ee_traj)[:, 0])
+    play_ee_pos_seq_t = np.array(play_ee_traj)[:, :, 0]
+    play_ee_pos_seq = np.array([np.vstack(b) for b in play_ee_pos_seq_t])
     play_ee_pos_seq = torch.tensor(play_ee_pos_seq).to('cpu')
     play_ee_pos_seq = w_robot_coord.transform_point(play_ee_pos_seq)
 
-    command_play_ee_pos_seq = np.vstack(np.array(command_play_ee_traj)[:, 0])
+    command_play_ee_pos_seq_t = np.array(command_play_ee_traj)[:, :, 0]
+    command_play_ee_pos_seq = np.array([np.vstack(b) for b in command_play_ee_pos_seq_t])
     command_play_ee_pos_seq = torch.tensor(command_play_ee_pos_seq).to('cpu')
     command_play_ee_pos_seq = w_robot_coord.transform_point(command_play_ee_pos_seq)
 
-    command_play_delta = torch.stack((play_ee_pos_seq, command_play_ee_pos_seq), dim=1)
+    command_play_delta = torch.stack((play_ee_pos_seq, command_play_ee_pos_seq), dim=2)
+
+    print(command_play_delta.shape)
 
     er = torch.sum((ee_pos_seq - play_ee_pos_seq)**2)
     print(f'\n\nThe error is {er} \n\n')
@@ -165,9 +174,9 @@ def mpc_robot_interactive(args, gym_instance):
           f'command delta: {command_delta.shape}, '
           f'play_ee_pos_seq: {play_ee_pos_seq.shape}')
 
-    color1 = np.array([1.0, 0.0, 0.0])
-    color2 = np.array([0.0, 1.0, 0.0])
-    color3 = np.array([0.0, 0.0, 1.0])
+    color0 = np.array([1.0, 0.0, 0.0])
+    color1 = np.array([0.0, 1.0, 0.0])
+    color2 = np.array([0.0, 0.0, 1.0])
     color_list = np.array([[1.0, 0.0, 0.0],
                        [0.0, 1.0, 0.0],
                        [0.0, 0.0, 1.0]])
@@ -178,13 +187,14 @@ def mpc_robot_interactive(args, gym_instance):
             if first:
                 first = False
                 gym_instance.clear_lines()
-                gym_instance.draw_lines(ee_pos_seq, color=color1)
+                gym_instance.draw_lines(ee_pos_seq, color=color0)
                 # gym_instance.draw_lines(play_ee_pos_seq, color=color2)
                 # gym_instance.draw_lines(command_ee_pos_seq, color=color2)
                 for j in range(len(command_delta)):
-                    if j%15 == 0:
+                    if j%20 == 0:
                         gym_instance.draw_lines(command_delta[j], color=color_list[1])
-                        gym_instance.draw_lines(command_play_delta[j], color=color_list[2])
+                        for k in range(len(command_play_delta)):
+                            gym_instance.draw_lines(command_play_delta[k, j], color=color_list[2])
         except KeyboardInterrupt:
             print('close')
             break
